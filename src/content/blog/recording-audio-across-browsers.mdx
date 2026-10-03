@@ -1,0 +1,89 @@
+export const meta = {
+  title: "Recording audio in the browser: Chrome, Safari and Firefox don't agree",
+  description:
+    "MediaRecorder looks simple until a Safari user uploads a file your backend thinks is WebM. What I learned getting call recordings to work everywhere.",
+  date: "2026-10-02",
+  tags: ["JavaScript", "MediaRecorder", "ffmpeg"],
+};
+
+Do you know which audio formats each browser can actually record? I didn't, until a Safari user's recording got saved with the wrong file type.
+
+`MediaRecorder` makes recording audio in the browser look like a few lines of code. And it is, as long as everyone uses the same browser. Once real users show up with Safari and Firefox, the details start to matter.
+
+These are the things I ran into while building call recording for a voice app.
+
+## 1. Browsers record in different formats
+
+Not every browser can record every format:
+
+- **Safari** records MP4 (AAC audio). It can't record WebM.
+- **Firefox** records WebM or Ogg (Opus audio). It can't record MP4.
+- **Chrome** records WebM, and recent versions can record MP4 too.
+
+So hard-coding `audio/webm;codecs=opus` will fail on Safari. Instead, give a list of formats in the order you prefer and pick the first one the browser supports:
+
+```js
+const PREFERRED = [
+  "audio/mp4;codecs=mp4a.40.2",
+  "audio/mp4",
+  "audio/webm;codecs=opus",
+  "audio/webm",
+];
+
+const mimeType = PREFERRED.find((type) => MediaRecorder.isTypeSupported(type));
+const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+```
+
+I put MP4 first because it opens with the default player on more computers. A `.webm` audio file often won't open with a double click, especially on a Mac.
+
+## 2. Read the format the browser actually chose
+
+Even with the list above, the browser may fall back to its own default. Don't label the file based on what you asked for. Read `recorder.mimeType` after creating the recorder, and use that for the upload's file type and extension.
+
+```js
+const EXTENSIONS = { mp4: "m4a", webm: "webm", ogg: "ogg" };
+
+function extensionFor(mimeType) {
+  const container = mimeType.split(";")[0].split("/")[1];
+  return EXTENSIONS[container] ?? "webm";
+}
+
+const ext = extensionFor(recorder.mimeType);
+```
+
+This was the actual bug I had: Safari was recording MP4, the code assumed WebM, and the file was saved with the wrong extension and type. Some tools refused to open it.
+
+## 3. Ask for echo cancellation
+
+If the user isn't wearing headphones, the mic picks up whatever is playing through the speakers. For a voice app, that means the other side of the conversation ends up in the user's recording too. Turn on the browser's built-in processing:
+
+```js
+const stream = await navigator.mediaDevices.getUserMedia({
+  audio: {
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
+  },
+});
+```
+
+## 4. Convert on the server so everyone gets one format
+
+Accepting whatever the browser can record is the right call on the frontend. But reviewers listening to recordings shouldn't have to deal with three formats. On the backend, I convert every upload to MP3 with ffmpeg, so storage always holds a single format that plays anywhere.
+
+```bash
+ffmpeg -y -i source.m4a -vn -ac 1 -ar 44100 -b:a 96k -codec:a libmp3lame output.mp3
+```
+
+Mono is enough for speech, and 96k keeps enough quality for anything you might do with the audio later.
+
+One small thing: write the upload to a temporary file and give ffmpeg that, rather than piping it in. A regular MP4 file keeps its index at the end, so it needs to be read in a seekable way. ffmpeg can still manage over a pipe, but only by holding the whole recording in memory first.
+
+If the conversion fails, keep the original file. A recording in an awkward format is better than no recording.
+
+## Summary
+
+- Pick the recording format from a preference list with `isTypeSupported`.
+- Trust `recorder.mimeType`, not what you requested.
+- Turn on echo cancellation.
+- Convert everything to one format on the server, and keep the original if that fails.

@@ -1,0 +1,48 @@
+export const meta = {
+  title: "A background job that lost uploads without an error",
+  description:
+    "An interview recording never got processed, and nothing anywhere said why. I made that kind of mistake stop the worker at startup instead.",
+  date: "2026-09-07",
+  context: "AI interview platform",
+  tags: ["Python", "taskiq", "Redis", "Docker"],
+};
+
+## The problem
+
+When an interview ends, the browser uploads the recording and the API hands the processing off to a background worker. One recording simply never appeared. The upload had worked. There was no failed job, no error in the API, and nothing in our logs.
+
+## Finding the cause
+
+The worker runs on [taskiq](https://taskiq-python.github.io/) with Redis as the broker. When a taskiq worker receives a message for a task it doesn't know about, it logs a warning and drops the message. There's no retry and no dead-letter queue. The message is just gone.
+
+That's what happened here. The worker container was started with a list of task modules on the command line, and that list had to be kept up to date by hand. The recording task wasn't being registered in that container, so the worker had no idea the task existed.
+
+On top of that, the "task not found" warning went through Python's standard logger, which wasn't connected to our log pipeline. So the one message that would have explained it never reached anyone.
+
+## The fix
+
+Adding the missing module to the list would have fixed this one case. But the list was the real problem: it depended on someone remembering to update it, and getting it wrong failed silently. So I changed how tasks get registered:
+
+1. **Discover task modules automatically.** The broker module now imports every module in the tasks folder itself, so the worker command doesn't need a list at all. If any task module fails to import, the worker refuses to start. taskiq's own file discovery logs a warning and carries on in that case, which is exactly the kind of silent failure I was trying to get rid of.
+
+2. **Check the registered tasks at startup.** The worker reads the task files with Python's `ast` module, finds every function decorated as a task, and compares that with what the broker actually registered. If anything is missing, it stops. Because it parses the files instead of importing them, the same check runs in unit tests without needing any cloud credentials.
+
+   ```python
+   @broker.on_event(TaskiqEvents.WORKER_STARTUP)
+   async def verify_tasks(_state):
+       missing = expected_task_names() - set(broker.get_all_tasks())
+       if missing:
+           raise RuntimeError(f"tasks not registered: {sorted(missing)}")
+   ```
+
+3. **Log what was registered.** On every start, the worker logs the full list of tasks through the app's logger, which does reach our log tool. After a deploy you can see the list, and if it's shorter than usual, it stands out.
+
+4. **Tests** for the discovery code. Discovery also stops with a clear error if someone adds a sub-folder of tasks, since it doesn't look inside sub-folders and would otherwise miss them.
+
+## The result
+
+If a worker can't run one of its tasks, it now fails to start. That shows up immediately when you deploy, instead of quietly dropping work until someone notices something is missing.
+
+## What I took away from it
+
+A crash is better than a silent drop. If a setup mistake can lose data, make it fail loudly at startup, before any real work comes in.

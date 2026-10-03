@@ -1,0 +1,131 @@
+export const meta = {
+  title: "Bloom filters: checking a billion usernames without touching the database",
+  description:
+    "A probabilistic data structure that answers \"definitely not\" or \"maybe\" from memory. How it works, how to size one, and what to watch out for.",
+  date: "2026-10-03",
+  tags: ["System design", "Data structures", "Python", "Redis"],
+};
+
+Do you know what happens when you type a username on a signup form and it instantly says "available"?
+
+With a few thousand users, the app can just ask the database. With a billion users, and a check on every keystroke, that gets expensive fast. Even with an index, that's a lot of lookups hitting your primary database for answers that are mostly "no, nobody has that name".
+
+One of my favourite tools for this is the **Bloom filter**.
+
+## What it is
+
+A Bloom filter is a probabilistic data structure that tells you whether something **might** be in a set. It only ever gives two answers:
+
+- **Definitely not in the set.** This answer is always correct.
+- **Probably in the set.** This one can occasionally be wrong.
+
+So there are no false negatives, but there can be false positives. It might say a username is taken when it isn't, but it will never say a name is free when someone already has it.
+
+That trade-off is what makes it so small and so fast.
+
+## How it works
+
+A Bloom filter is just an array of bits, all starting at 0, plus a few hash functions.
+
+**Adding a value:**
+
+1. Run the value through each hash function.
+2. Each hash gives you a position in the bit array.
+3. Set those positions to 1.
+
+**Checking a value:**
+
+1. Run it through the same hash functions.
+2. If **any** of those positions is 0, the value was definitely never added.
+3. If **all** of them are 1, it was probably added. Those bits might also have been set by other values, which is where false positives come from.
+
+The filter never stores the usernames themselves. That's why it stays so small.
+
+## How small?
+
+The size depends on how many items you expect and how many false positives you can live with. For 1 billion usernames:
+
+| False positive rate | Bits per item | Memory | Hash functions |
+| --- | --- | --- | --- |
+| 1% | 9.6 | ~1.2 GB | 7 |
+| 0.1% | 14.4 | ~1.8 GB | 10 |
+| 0.01% | 19.2 | ~2.4 GB | 13 |
+
+Storing a billion actual usernames would take many times more than that. At around 1.2 GB, the whole filter fits in memory on an app server, or in Redis.
+
+The formulas behind the table, where `n` is the number of items and `p` is the false positive rate:
+
+```
+bits needed     m = -n × ln(p) / (ln 2)²
+hash functions  k = (m / n) × ln 2
+```
+
+## A small implementation
+
+Here's a working version in Python. Instead of writing 7 separate hash functions, it takes one SHA-256 hash, splits it into two numbers, and combines them to get as many positions as it needs. This is a well-known trick that works just as well in practice.
+
+```python
+import hashlib
+import math
+
+class BloomFilter:
+    def __init__(self, expected_items: int, false_positive_rate: float):
+        self.size = math.ceil(-expected_items * math.log(false_positive_rate) / math.log(2) ** 2)
+        self.hash_count = max(1, round(self.size / expected_items * math.log(2)))
+        self.bits = bytearray(math.ceil(self.size / 8))
+
+    def _positions(self, item: str):
+        digest = hashlib.sha256(item.encode()).digest()
+        h1 = int.from_bytes(digest[:8], "big")
+        h2 = int.from_bytes(digest[8:16], "big") | 1
+        for i in range(self.hash_count):
+            yield (h1 + i * h2) % self.size
+
+    def add(self, item: str):
+        for pos in self._positions(item):
+            self.bits[pos // 8] |= 1 << (pos % 8)
+
+    def might_contain(self, item: str) -> bool:
+        return all(self.bits[pos // 8] & (1 << (pos % 8)) for pos in self._positions(item))
+```
+
+I tested it with 100,000 usernames at a 1% target. It used about 117 KB, found every name that had been added, and wrongly said "probably taken" for 1.02% of names that hadn't. Right on target.
+
+## The signup flow
+
+```
+User types a username
+↓
+Check the Bloom filter (in memory)
+↓
+Definitely not there → "Username available", no database call
+↓
+Probably there → check the cache or database to be sure
+```
+
+Most names people try for the first time are free, so most checks end at the first step without touching the database.
+
+## Things to watch out for
+
+**The database still decides.** Two people can pick the same free name at the same moment. The Bloom filter is a fast first check, not the final answer. Keep a unique constraint on the username column and handle the error when it fires.
+
+**You can't remove items.** Clearing bits for one value might clear bits that other values share. If users can delete accounts or change usernames, either accept that old names will show as "probably taken" (which just costs a database check), rebuild the filter now and then, or use a counting Bloom filter, which keeps a small counter instead of a single bit.
+
+**It gets worse as it fills up.** The false positive rate in the table only holds up to the number of items you sized it for. Go past that and it climbs. Size it for where you'll be in a year, not where you are today.
+
+**Every server needs the same filter.** If you run several app servers, each with its own copy in memory, they need to stay in sync. Keeping one filter in Redis avoids that. The RedisBloom module (included in Redis Stack) has this built in with commands like `BF.ADD` and `BF.EXISTS`.
+
+**Build it before you use it.** On startup, the filter is empty and would say "definitely not" for everything, which is wrong. Load every existing username into it first, then add each new one as people sign up.
+
+## Where else they show up
+
+The same idea shows up anywhere a cheap "definitely not" saves an expensive lookup:
+
+- Databases skipping files on disk that can't contain a key
+- Caches avoiding lookups for keys that were never stored
+- Checking if a URL has already been crawled
+- Checking passwords against a list of leaked ones
+
+## The takeaway
+
+Sometimes scaling isn't about adding more servers. It's about picking a data structure that lets you skip most of the work.

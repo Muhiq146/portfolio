@@ -1,0 +1,86 @@
+export const meta = {
+  title: "Turning volunteers' voice notes into verification forms, in Hinglish",
+  description:
+    "Volunteers talk the way they talk. The form needs clean, structured fields. How I used speech-to-text and an LLM to bridge the two, without letting the model make things up.",
+  date: "2026-09-13",
+  context: "Aafiyat Foundation · My own project",
+  tags: ["Voice AI", "LLM", "Node.js", "Privacy"],
+};
+
+## The problem
+
+Before Aafiyat Foundation helps a family, a volunteer visits them at home to check the situation. We call this a **tehkeek**. The volunteer then fills in a long form in the admin app: the family's income, whether they rent or own their home, who lives there, what the money is needed for, how much they've already arranged, and the volunteer's own opinion on the case.
+
+Typing all of that on a phone, often standing outside someone's home, is slow, and it's easy to cut corners or leave things out. The people deciding on the case only have those notes to go on.
+
+Talking is much faster. But volunteers speak in whatever mix of Gujarati, Hindi, Urdu and English comes naturally, and the form needs clean, separate fields.
+
+## What I built
+
+A volunteer can now tap a mic button in the form and just talk for up to five minutes. When they're done:
+
+```
+Volunteer records a voice note
+↓
+Audio goes to speech-to-text (Whisper on Groq)
+↓
+Names, phone numbers and addresses are removed from the transcript
+↓
+An LLM turns the transcript into the form's fields, as JSON
+↓
+Code checks the output and drops anything it can't trust
+↓
+The form is filled in for the volunteer to review, edit and save
+```
+
+Nothing is saved automatically. The volunteer always reviews the result, and once a decision has been made on a case, its verification can't be edited any more.
+
+## Keeping families' details private
+
+These are families in a difficult situation, so privacy came first.
+
+- **The audio is never stored.** It goes straight from the phone, through our backend's memory, to the transcription service. No file is written anywhere.
+- **Names, phone numbers and addresses are removed before the LLM sees the text.** We already have the family's details in the database, so the backend removes those exact values from the transcript. A second pass catches general patterns like emails, bank IFSC codes, ID numbers and long digit strings.
+- **The same removal runs again on the LLM's output**, in case anything slipped through.
+- **The prompt tells the model to refer to people by relationship**, like "bhai", "aapa" or "bada beta", never by name.
+
+## Getting the model to write like our volunteers
+
+The first results were accurate but read like a formal English report. Our volunteers don't write like that. They write short, casual notes in Roman Hindustani, and the people reading them are used to that style.
+
+So the prompt includes examples of wrong and right output:
+
+```
+Wrong: "The husband works as a daily wage labourer and has had no work for three months."
+Right: "Bhai mazdoori karte hain, 3 mahine se kaam nahi hai."
+```
+
+It also has rules for the details that matter in this form:
+
+- Spoken amounts become digits: "dedh lakh" becomes 150000, "paanch hazaar" becomes 5000.
+- Fields like "house status" only accept fixed values ("Owned" or "Rented").
+- Everything must be in Roman script, with no Devanagari, Gujarati or Arabic characters.
+- If the volunteer didn't mention something, the field stays empty. No "N/A" and no guesses.
+
+## Not trusting the model's word
+
+Prompts help, but I didn't want correctness to depend on the model following instructions. So the backend checks the output itself:
+
+- **Invalid JSON** gets one repair attempt, where the model is asked to fix its own reply.
+- **Non-Roman script, wrong enum values and overly long text** are caught and fixed or removed in code.
+- **English instead of Hinglish:** if the longer fields contain none of a list of common Roman Hindustani words ("hai", "nahi", "ghar", "madad" and so on), the model is asked once more with a reminder.
+- **The volunteer's opinion has to be quoted.** This is the most sensitive field, because it influences whether a family gets help. Along with the opinion, the model must return the exact words from the transcript it came from. The backend then checks that those words really appear in the transcript. If they don't, the opinion is dropped. A made-up recommendation is worse than no recommendation.
+
+## Filling the gaps
+
+The response also lists which fields are still empty, along with a plain question for each one, for example "How much has the family already arranged on their own?".
+
+The volunteer can record a follow-up note to answer them. Instead of merging two AI outputs, the backend runs the full extraction again over **all** recordings together. That keeps every check working, including the opinion quote check, even if the opinion was said in the first recording and not repeated in the second.
+
+## Working within the limits
+
+The backend runs on Vercel, which caps request bodies at 4.5 MB. Rather than adding cloud storage just to hold the audio, the app records in mono at 24 kbps. At that rate, the maximum five-minute recording comes to under 1 MB, comfortably inside the limit. That also kept the "never stored" promise simple to keep.
+
+## What I took away from it
+
+Use the model for what it's good at, understanding messy speech, and use plain code to check everything it hands back. Asking the model to quote its source, and then checking the quote, was the single most useful trick in the whole feature.

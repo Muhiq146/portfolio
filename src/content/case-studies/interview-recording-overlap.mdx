@@ -1,0 +1,64 @@
+export const meta = {
+  title: "The AI interviewer that talked over the candidate",
+  description:
+    "In the live call everything sounded fine. In the recording, the bot kept talking over people. The cause was two clocks that didn't agree.",
+  date: "2026-09-07",
+  context: "AI interview platform",
+  tags: ["TypeScript", "Web Audio", "MediaRecorder", "Azure Speech"],
+};
+
+## The problem
+
+The platform records every interview so a reviewer can listen to it later. The browser records two tracks at the same time:
+
+- a **mixed track** with both the AI interviewer and the candidate, for reviewers
+- a **candidate-only track**, which is used to score pronunciation
+
+The bug: in the mixed recording, the end of the interviewer's question played over the start of the candidate's answer. In the live call this never happened. The candidate always heard the full question before answering.
+
+## Finding the cause
+
+The interviewer's voice comes from a speech SDK that plays audio to the speaker **while it is still synthesizing**. Playback starts almost straight away.
+
+To get the interviewer into the recording, we also fed its audio into the recording mix. But the SDK only gives you the complete audio buffer **after synthesis has finished**. By that point, the candidate had already been listening to it for a while.
+
+Our recording code took that buffer and played it into the mix from the beginning. So in the recording, every question started late by exactly the amount the candidate had already heard. The tail of each question got pushed into the candidate's reply.
+
+The recorder was running on wall-clock time. The bot's audio was arriving on "synthesis finished" time. Those are not the same thing.
+
+## The fix
+
+Note the moment playback actually starts. When the full buffer arrives, work out how much has already been played, and start the recorded copy from that point instead of from zero.
+
+```ts
+let playbackStartedAt: number | null = null;
+speaker.onAudioStart = () => {
+  playbackStartedAt = Date.now();
+};
+
+// Later, once synthesis has finished and we have the whole utterance:
+const alreadyPlayedMs = Date.now() - (playbackStartedAt ?? synthesisStartedAt);
+const decoded = await ctx.decodeAudioData(audioData.slice(0));
+const offset = Math.min(Math.max(alreadyPlayedMs, 0) / 1000, decoded.duration);
+
+const source = ctx.createBufferSource();
+source.buffer = decoded;
+source.connect(recordingMix);
+source.start(0, offset);
+```
+
+This lines up the **end** of each question in the recording with when it really ended. If the question had already finished playing by the time the buffer arrived, the offset lands at the end and nothing gets added, which is the right outcome.
+
+The `slice(0)` is there because `decodeAudioData` takes ownership of the buffer it's given, and the SDK might still be using the original.
+
+## Other fixes in the same pass
+
+While I was in this code, I found a few related problems:
+
+- **Interruptions.** When a candidate starts talking over the interviewer, we stop the interviewer's audio. The copy going into the recording kept playing. I now keep track of the interviewer's audio sources in the mix and stop them too.
+- **Echo.** Without headphones, the mic picks up the interviewer's voice from the speakers. That doubled the interviewer in the mixed track and polluted the candidate-only track used for scoring. Turning on echo cancellation, noise suppression and auto gain for the mic fixed most of it.
+- **File format.** Safari can only record MP4, but its recordings were being uploaded and saved as `.webm`. I wrote a separate post on [recording audio across browsers](/blog/recording-audio-across-browsers/) about how I sorted that out.
+
+## What I took away from it
+
+When audio comes from more than one source, figure out which clock each piece of code is using. Most of the bugs here came from assuming "now" meant the same thing everywhere.

@@ -1,0 +1,61 @@
+export const meta = {
+  title: "Why your Web Audio works locally but is silent in production",
+  description:
+    "Browsers won't play audio until the user has interacted with the page. Here's how that bites voice apps, and the small change that fixes it.",
+  date: "2026-10-02",
+  tags: ["JavaScript", "Web Audio", "Voice apps"],
+};
+
+Ever shipped a voice feature that worked perfectly on your machine and then said nothing at all in production?
+
+I hit this on a voice app. Locally the AI agent spoke just fine, but in production its voice simply didn't play. No errors in the console. The audio was arriving from the server, it just never came out of the speakers.
+
+## What's going on
+
+Browsers have an autoplay policy. A page isn't allowed to start making sound until the user has interacted with it, for example by clicking or tapping.
+
+For the Web Audio API, this shows up in a quiet way. If you create an `AudioContext` before the user has interacted with the page, it starts in the `"suspended"` state. Anything you play through it goes nowhere. There's no exception, it just stays silent.
+
+## Why it works locally
+
+When you're developing, you've almost always clicked something on the page already. Chrome also remembers sites where you play media a lot and relaxes the rules for them. So on your own machine, audio tends to just work.
+
+A real user who opens a link and joins a call is in a very different position, and that's when you find out.
+
+## The bug in my case
+
+The app created its `AudioContext` lazily, the first time a chunk of audio arrived from the websocket. That's convenient, but it means the context was created in a websocket callback, not in a click. It started suspended. There was a `resume()` call, but it wasn't awaited and it also wasn't running inside a user gesture, so it didn't help.
+
+## The fix
+
+Create and resume the `AudioContext` in the handler of the click that starts the call. Do it at the start of the handler, before any other `await`. Safari in particular is stricter than Chrome about this.
+
+```js
+let ctx;
+
+async function unlockAudio() {
+  ctx ??= new AudioContext();
+  if (ctx.state === "suspended") {
+    await ctx.resume();
+  }
+  return ctx;
+}
+
+startCallButton.addEventListener("click", async () => {
+  await unlockAudio(); // first thing, while we're still inside the click
+  await connectWebSocket();
+  startMicrophone();
+});
+```
+
+The rest of the app reuses that same context instead of creating its own.
+
+## A few extra things worth doing
+
+- **Await `resume()`.** It returns a promise. If you play audio before it resolves, the first chunk can get lost.
+- **Check `ctx.state` before playing.** If it's still suspended, show a small "Tap to enable sound" button instead of failing silently.
+- **Listen for `statechange`.** On mobile, the context can get suspended again when the app goes to the background or a phone call comes in.
+
+## Summary
+
+If audio works for you and not for your users, check whether your `AudioContext` was created or resumed outside a click. Moving that one call into the button handler fixed it for us.

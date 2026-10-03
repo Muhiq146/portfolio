@@ -1,0 +1,85 @@
+export const meta = {
+  title: "Getting a voice agent to start talking sooner",
+  description:
+    "The agent waited for the whole LLM reply before saying a word. I changed it to speak each sentence as soon as it was ready.",
+  date: "2026-05-25",
+  context: "Voice AI product",
+  tags: ["Python", "asyncio", "LLM streaming", "Text-to-speech"],
+};
+
+## The problem
+
+In a voice conversation, silence feels broken. If you ask something and nothing happens for a few seconds, you start wondering if the call dropped.
+
+Our agent handled each turn in strict order:
+
+1. Transcribe what the user said.
+2. Wait for the LLM to write the full reply.
+3. Send the full reply to text-to-speech.
+4. Play it.
+
+Every step waited for the one before it to finish completely. A short answer was fine, but a longer answer meant a long pause before the agent said anything at all.
+
+## The idea
+
+People don't plan out a whole paragraph before they start talking, and the agent doesn't need to either. The LLM already streams its reply a few tokens at a time. If I could cut that stream into sentences as they finished, the first sentence could go to text-to-speech while the LLM was still writing the second one.
+
+## What I built
+
+There were three parts:
+
+1. **A streaming call to the LLM.** The client already talked to the model over a websocket, but only returned the reply at the end. I added a method that yields each text delta as it arrives.
+2. **A sentence splitter** that works on a buffer that keeps growing.
+3. **A small producer and consumer pipeline.** The LLM loop pushes finished sentences into an `asyncio.Queue`. A separate task pulls them out, synthesizes each one and streams the audio chunks to the browser.
+
+Here's the shape of it, simplified:
+
+```python
+async def speak_reply(messages):
+    queue = asyncio.Queue()
+
+    async def tts_worker():
+        while (sentence := await queue.get()) is not None:
+            audio = await synthesize(sentence)
+            await send_audio_chunk(audio)
+
+    worker = asyncio.create_task(tts_worker())
+    buffer = ""
+    try:
+        async for delta in llm.stream(messages):
+            buffer += delta
+            ready, buffer = split_sentences(buffer)
+            for sentence in ready:
+                await queue.put(sentence)
+        if buffer.strip():
+            await queue.put(buffer.strip())  # whatever is left at the end
+    finally:
+        await queue.put(None)  # tell the worker to stop
+        await worker
+```
+
+Because the worker handles one sentence at a time in order, the audio always plays back in the right sequence, even though synthesis and generation overlap.
+
+## The tricky part: when has a sentence ended?
+
+Splitting on a full stop sounds easy until you remember the text is arriving in small pieces. A few cases broke the first version:
+
+- `The price is 3.` could be the end of a sentence, or the start of `3.5`. If the buffer ends right on the punctuation, you can't know yet.
+- `Talk to Dr. Shah` has a full stop that isn't the end of anything.
+- `e.g.` and `i.e.` have two of them.
+
+So the splitter only treats `.`, `!` or `?` as the end of a sentence when it's followed by whitespace, and when the word before it isn't on a short list of common abbreviations. If the buffer ends on punctuation, it waits for the next delta before deciding.
+
+## A few other details
+
+- The LLM connection is shared between requests, so the stream holds a lock until the reply has been fully read. Without that, a follow-up request could start while the previous reply was still coming in.
+- I kept the old non-streaming path as a fallback.
+- I added timing logs for the first LLM token and the first audio chunk sent, so we could see exactly where the time went on each turn.
+
+## The result
+
+The agent now starts speaking as soon as the first sentence has been synthesized, instead of after the entire reply has been written and then synthesized. Longer answers improved the most, because the rest of the reply is generated while the first sentences are already playing.
+
+## What I took away from it
+
+Streaming only helps if every step streams. One step that waits for the complete input is enough to bring the whole delay back.
