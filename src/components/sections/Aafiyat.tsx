@@ -1,70 +1,70 @@
 import Link from "next/link";
 import Reveal from "@/components/Reveal";
-import { SectionHeading, Tag } from "@/components/ui";
+import { Container, SectionHeading, Stack } from "@/components/ui";
 import { aafiyat } from "@/content/site";
 
 export default function Aafiyat() {
   return (
-    <section id="aafiyat" className="border-y border-line bg-surface/40">
-      <div className="mx-auto max-w-6xl px-4 py-24 sm:px-6">
-        <SectionHeading index="02" eyebrow="My own project" title={aafiyat.name}>
-          {aafiyat.intro}
-        </SectionHeading>
+    <section id="aafiyat" className="bg-surface/70 py-24 sm:py-32">
+      <Container>
+        <div className="grid gap-10 lg:grid-cols-12 lg:items-end">
+          <SectionHeading eyebrow="My own project" title={aafiyat.name} className="lg:col-span-7">
+            {aafiyat.intro}
+          </SectionHeading>
+          <blockquote className="border-l-2 border-accent pl-5 lg:col-span-5">
+            <p className="font-serif text-xl italic leading-snug">
+              &ldquo;A made-up recommendation is worse than no recommendation.&rdquo;
+            </p>
+            <footer className="mt-2 text-sm text-muted">From the voice notes case study below</footer>
+          </blockquote>
+        </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="mt-14 grid gap-12 border-t border-line-strong pt-10 lg:grid-cols-2 lg:gap-16">
           {aafiyat.products.map((p, i) => (
             <Reveal key={p.name} delay={i * 80}>
-              <article className="flex h-full flex-col rounded-2xl border border-line bg-bg p-6 sm:p-7">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h3 className="text-xl font-medium tracking-tight">{p.name}</h3>
-                    <p className="mt-1 font-mono text-[11px] uppercase tracking-widest text-faint">{p.tag}</p>
-                  </div>
-                  {"url" in p && p.url && (
-                    <a
-                      href={p.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="shrink-0 rounded-full border border-line-strong px-3 py-1 font-mono text-xs text-muted transition hover:border-signal hover:text-signal"
-                    >
-                      Live ↗
+              <article>
+                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                  <h3 className="font-serif text-3xl font-medium tracking-tight">{p.name}</h3>
+                  {"url" in p && p.url ? (
+                    <a href={p.url} target="_blank" rel="noreferrer" className="ink-link text-sm">
+                      {p.tag} ↗
                     </a>
+                  ) : (
+                    <span className="text-sm text-faint">{p.tag}</span>
                   )}
                 </div>
-                <p className="mt-4 text-pretty text-muted">{p.body}</p>
-                <ul className="mt-5 flex-1 space-y-2 text-sm">
+                <p className="mt-4 leading-relaxed text-muted text-pretty">{p.body}</p>
+                <ul className="mt-5 space-y-2">
                   {p.highlights.map((h) => (
                     <li key={h} className="flex gap-3">
-                      <span aria-hidden className="mt-2 size-1.5 shrink-0 rounded-full bg-signal" />
+                      <span aria-hidden className="text-olive">✓</span>
                       {h}
                     </li>
                   ))}
                 </ul>
-                <ul className="mt-6 flex flex-wrap gap-1.5">
-                  {p.stack.map((s) => (
-                    <Tag key={s}>{s}</Tag>
-                  ))}
-                </ul>
+                <Stack items={p.stack} className="mt-6" />
               </article>
             </Reveal>
           ))}
         </div>
 
-        <Reveal className="mt-4">
+        <Reveal className="mt-14">
           <Link
             href={aafiyat.caseStudy}
-            className="group flex flex-col gap-2 rounded-2xl border border-signal/40 bg-signal-dim p-6 transition hover:border-signal sm:flex-row sm:items-center sm:justify-between"
+            className="group flex flex-col gap-3 rounded-2xl bg-ink p-7 text-bg transition hover:bg-[#2a241e] sm:flex-row sm:items-center sm:justify-between sm:p-9"
           >
             <div>
-              <p className="font-mono text-[11px] uppercase tracking-widest text-signal">Case study</p>
-              <p className="mt-1 text-lg font-medium tracking-tight">
+              <p className="font-serif italic text-[#e9b99f]">Case study</p>
+              <p className="mt-1 font-serif text-2xl font-medium leading-snug tracking-tight sm:text-3xl">
                 Turning volunteers&apos; voice notes into verification forms, in Hinglish
               </p>
             </div>
-            <span className="text-sm text-ink transition group-hover:text-signal">Read →</span>
+            <span className="shrink-0 text-sm font-medium transition group-hover:translate-x-1">
+              Read the story →
+            </span>
           </Link>
         </Reveal>
-      </div>
+      </Container>
     </section>
   );
 }

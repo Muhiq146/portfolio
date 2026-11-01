@@ -1,23 +1,27 @@
 @import "tailwindcss";
 
+/* Warm paper palette. Contrast checked against the paper: ink 15:1, muted 5.3:1,
+   faint 4.7:1, accent 4.7:1. */
 @theme {
-  --color-bg: #0a0b0d;
-  --color-surface: #111317;
-  --color-surface-2: #171a1f;
-  --color-line: #23272e;
-  --color-line-strong: #343a43;
-  --color-ink: #e8eaed;
-  --color-muted: #9aa0a6;
-  --color-faint: #6b727c;
-  --color-signal: #b6f36a;
-  --color-signal-dim: #b6f36a1f;
+  --color-bg: #f5f0e6;
+  --color-surface: #ede5d6;
+  --color-surface-2: #e6dccb;
+  --color-line: #ddd2bf;
+  --color-line-strong: #c9bba3;
+  --color-ink: #1e1a16;
+  --color-muted: #6b6258;
+  --color-faint: #736a5d;
+  --color-accent: #b24a25;
+  --color-accent-soft: #b24a2514;
+  --color-olive: #5e6b4e;
 
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-fraunces), ui-serif, Georgia, serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html {
@@ -25,59 +29,34 @@ html {
   scroll-padding-top: 5rem;
 }
 
+/* A faint paper grain so the background doesn't read as a flat screen colour. */
 body {
-  background: var(--color-bg);
+  background-color: var(--color-bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .28 0 0 0 0 .2 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   color: var(--color-ink);
 }
 
 ::selection {
-  background: var(--color-signal);
+  background: var(--color-accent);
   color: var(--color-bg);
 }
 
-/* Faint engineering grid behind the hero */
-.grid-bg {
-  background-image:
-    linear-gradient(to right, #ffffff08 1px, transparent 1px),
-    linear-gradient(to bottom, #ffffff08 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(ellipse 80% 70% at 50% 30%, #000 40%, transparent 100%);
+/* Fraunces at display sizes: a touch of softness keeps it warm rather than formal. */
+.font-serif {
+  font-variation-settings: "SOFT" 50;
 }
 
 /* Scroll reveal, driven by <Reveal> */
 .reveal {
   opacity: 0;
-  transform: translateY(16px);
+  transform: translateY(12px);
   transition:
-    opacity 0.7s ease,
-    transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+    opacity 0.8s ease,
+    transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 .reveal[data-visible="true"] {
   opacity: 1;
   transform: none;
-}
-
-/* Packets travelling along the pipeline diagram: vertical on mobile, horizontal from lg */
-@keyframes flow-down {
-  to {
-    background-position: 0 12px;
-  }
-}
-@keyframes flow-right {
-  to {
-    background-position: 12px 0;
-  }
-}
-.wire {
-  background: repeating-linear-gradient(to bottom, var(--color-line-strong) 0 4px, transparent 4px 12px);
-  animation: flow-down 0.8s linear infinite;
-}
-@media (width >= 64rem) {
-  .wire {
-    background: repeating-linear-gradient(to right, var(--color-signal) 0 4px, transparent 4px 12px);
-    opacity: 0.45;
-    animation-name: flow-right;
-  }
 }
 
 @keyframes blink {
@@ -89,6 +68,21 @@ body {
   animation: blink 1.6s ease-in-out infinite;
 }
 
+/* Hand-drawn style underline for links in running text */
+.ink-link {
+  text-decoration: underline;
+  text-decoration-color: var(--color-line-strong);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  transition:
+    color 0.2s,
+    text-decoration-color 0.2s;
+}
+.ink-link:hover {
+  color: var(--color-accent);
+  text-decoration-color: var(--color-accent);
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -98,7 +92,6 @@ body {
     transform: none;
     transition: none;
   }
-  .wire,
   .blink {
     animation: none;
   }
@@ -106,9 +99,9 @@ body {
 
 /* Article body (MDX) */
 .prose {
-  color: var(--color-muted);
+  color: #3a332c;
   font-size: 1.0625rem;
-  line-height: 1.75;
+  line-height: 1.8;
 }
 .prose > * + * {
   margin-top: 1.25em;
@@ -116,16 +109,19 @@ body {
 .prose h2 {
   margin-top: 2.4em;
   color: var(--color-ink);
-  font-size: 1.5rem;
-  font-weight: 600;
-  letter-spacing: -0.015em;
-  line-height: 1.3;
+  font-family: var(--font-serif);
+  font-size: 1.65rem;
+  font-weight: 500;
+  font-variation-settings: "SOFT" 50;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
 }
 .prose h3 {
   margin-top: 1.8em;
   color: var(--color-ink);
-  font-size: 1.2rem;
-  font-weight: 600;
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 500;
 }
 .prose h2 + *,
 .prose h3 + * {
@@ -138,11 +134,11 @@ body {
 .prose a {
   color: var(--color-ink);
   text-decoration: underline;
-  text-decoration-color: var(--color-signal);
+  text-decoration-color: var(--color-accent);
   text-underline-offset: 3px;
 }
 .prose a:hover {
-  color: var(--color-signal);
+  color: var(--color-accent);
 }
 .prose ul,
 .prose ol {
@@ -159,30 +155,28 @@ body {
   padding-left: 0.25em;
 }
 .prose li::marker {
-  color: var(--color-faint);
+  color: var(--color-accent);
 }
 .prose li > pre {
   margin-top: 1em;
 }
 .prose :not(pre) > code {
-  border: 1px solid var(--color-line);
   border-radius: 0.3rem;
   background: var(--color-surface-2);
-  padding: 0.1em 0.35em;
+  padding: 0.12em 0.38em;
   color: var(--color-ink);
   font-family: var(--font-mono);
   font-size: 0.85em;
 }
 .prose pre {
   overflow-x: auto;
-  border: 1px solid var(--color-line);
-  border-radius: 0.75rem;
-  background: var(--color-surface);
-  padding: 1rem 1.15rem;
-  color: var(--color-ink);
+  border-radius: 0.6rem;
+  background: #221d18;
+  padding: 1.1rem 1.25rem;
+  color: #efe7d8;
   font-family: var(--font-mono);
   font-size: 0.8125rem;
-  line-height: 1.65;
+  line-height: 1.7;
 }
 .prose table {
   display: block;
@@ -193,7 +187,7 @@ body {
 .prose th,
 .prose td {
   border-bottom: 1px solid var(--color-line);
-  padding: 0.6em 1.2em 0.6em 0;
+  padding: 0.6em 1.4em 0.6em 0;
   text-align: left;
   white-space: nowrap;
 }

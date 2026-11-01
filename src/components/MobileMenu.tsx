@@ -41,15 +41,15 @@ export default function MobileMenu({ links }: { links: Link[] }) {
       {open && (
         <div
           id="mobile-menu"
-          className="absolute inset-x-0 top-full border-b border-line bg-bg shadow-2xl shadow-black/60"
+          className="absolute inset-x-0 top-full border-b border-line bg-bg shadow-[0_18px_30px_-20px_rgba(60,40,20,0.45)]"
         >
-          <ul className="mx-auto flex max-w-6xl flex-col px-4 py-2">
+          <ul className="mx-auto flex max-w-6xl flex-col px-5 py-2">
             {links.map((l) => (
               <li key={l.href} className="border-b border-line last:border-0">
                 <a
                   href={l.href}
                   onClick={() => setOpen(false)}
-                  className="block py-3.5 text-base text-muted transition hover:text-ink"
+                  className="block py-3.5 font-serif text-xl text-ink transition hover:text-accent"
                 >
                   {l.label}
                 </a>

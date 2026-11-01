@@ -4,34 +4,36 @@ import Logo from "@/components/Logo";
 import { headshotSrc } from "@/lib/assets";
 import { profile } from "@/content/site";
 
+export function Container({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <div className={`mx-auto max-w-6xl px-5 sm:px-8 ${className}`}>{children}</div>;
+}
+
+// Italic serif label above a serif title. No numbering: sections read like chapters, not slides.
 export function SectionHeading({
-  index,
   eyebrow,
   title,
   children,
+  className = "mb-12",
 }: {
-  index: string;
   eyebrow: string;
-  title: string;
+  title: ReactNode;
   children?: ReactNode;
+  className?: string;
 }) {
   return (
-    <header className="mb-10 max-w-2xl">
-      <p className="font-mono text-xs uppercase tracking-widest text-signal">
-        {index} <span className="text-faint">/ {eyebrow}</span>
-      </p>
-      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{title}</h2>
-      {children && <p className="mt-4 text-muted text-pretty">{children}</p>}
+    <header className={`max-w-2xl ${className}`}>
+      <p className="font-serif text-lg italic text-accent">{eyebrow}</p>
+      <h2 className="mt-1 font-serif text-4xl font-medium leading-[1.1] tracking-tight text-balance sm:text-5xl">
+        {title}
+      </h2>
+      {children && <p className="mt-5 text-lg leading-relaxed text-muted text-pretty">{children}</p>}
     </header>
   );
 }
 
-export function Tag({ children }: { children: ReactNode }) {
-  return (
-    <li className="rounded-md border border-line bg-surface-2 px-2 py-0.5 font-mono text-[11px] text-muted">
-      {children}
-    </li>
-  );
+// Tech stack as a quiet line of text rather than a row of chips.
+export function Stack({ items, className = "" }: { items: string[]; className?: string }) {
+  return <p className={`text-sm text-faint ${className}`}>{items.join(" · ")}</p>;
 }
 
 export function Avatar({ size }: { size: number }) {
@@ -42,7 +44,7 @@ export function Avatar({ size }: { size: number }) {
         alt={profile.name}
         width={size}
         height={size}
-        className="shrink-0 rounded-full border border-line-strong object-cover"
+        className="shrink-0 rounded-full object-cover"
         style={{ width: size, height: size }}
       />
     );
@@ -50,19 +52,19 @@ export function Avatar({ size }: { size: number }) {
   return (
     <span
       aria-hidden
-      className="grid shrink-0 place-items-center rounded-full border border-line-strong bg-surface-2 text-signal"
+      className="grid shrink-0 place-items-center rounded-full bg-accent text-bg"
       style={{ width: size, height: size }}
     >
-      <Logo style={{ width: size * 0.52 }} strokeWidth={2.8} />
+      <Logo style={{ width: size * 0.5 }} strokeWidth={2.8} />
     </span>
   );
 }
 
-// Company icon on a neutral tile, so marks of different colours sit together evenly.
+// Company icon on a light tile, so marks of different colours sit together evenly.
 export function CompanyLogo({ src, size }: { src: string; size: number }) {
   return (
     <span
-      className="grid shrink-0 place-items-center rounded-xl border border-line bg-surface-2"
+      className="grid shrink-0 place-items-center rounded-lg border border-line bg-[#fbf8f2]"
       style={{ width: size, height: size }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element -- static export, decorative icon */}
@@ -71,5 +73,4 @@ export function CompanyLogo({ src, size }: { src: string; size: number }) {
   );
 }
 
-export const linkClass =
-  "underline decoration-line-strong underline-offset-4 transition hover:text-signal hover:decoration-signal";
+export const linkClass = "ink-link";

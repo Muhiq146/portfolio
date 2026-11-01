@@ -1,3 +1,4 @@
+import JsonLd, { personLd } from "@/components/JsonLd";
 import Aafiyat from "@/components/sections/Aafiyat";
 import Capabilities from "@/components/sections/Capabilities";
 import CaseStudies from "@/components/sections/CaseStudies";
@@ -8,10 +9,20 @@ import Hero from "@/components/sections/Hero";
 import Projects from "@/components/sections/Projects";
 import Skills from "@/components/sections/Skills";
 import Writing from "@/components/sections/Writing";
+import { profile, SITE_URL } from "@/content/site";
 
 export default function Home() {
   return (
     <main>
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@graph": [
+            personLd,
+            { "@type": "WebSite", name: profile.name, url: `${SITE_URL}/`, author: { "@id": personLd["@id"] } },
+          ],
+        }}
+      />
       <Hero />
       <Companies />
       <Capabilities />

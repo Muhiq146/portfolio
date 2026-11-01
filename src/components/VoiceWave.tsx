@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 type Mode = "idle" | "listening" | "denied";
 
 const BARS = 56;
-const SIGNAL = "182, 243, 106"; // --color-signal as rgb
+const ACCENT = "178, 74, 37"; // --color-accent as rgb
 
 // Canvas waveform: plays a synthetic "speech" pattern until the visitor turns on
 // their mic, then follows the live spectrum. Audio is analysed locally only.
@@ -76,7 +76,7 @@ export default function VoiceWave() {
 
         const level = levels[i];
         const barH = Math.max(3, level * height * 0.92);
-        g.fillStyle = `rgba(${SIGNAL}, ${0.25 + 0.75 * Math.min(1, level * 1.4)})`;
+        g.fillStyle = `rgba(${ACCENT}, ${0.3 + 0.7 * Math.min(1, level * 1.4)})`;
         g.beginPath();
         g.roundRect(i * (barW + gap), mid - barH / 2, barW, barH, barW / 2);
         g.fill();
@@ -135,39 +135,37 @@ export default function VoiceWave() {
   };
 
   const status = {
-    idle: "Synthetic voice",
-    listening: "Listening. Audio stays in your browser",
+    idle: "It reacts to your voice. Nothing is recorded.",
+    listening: "Listening. Audio stays in your browser.",
     denied: "Microphone unavailable",
   }[mode];
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-line bg-surface/80 backdrop-blur">
-      <div className="flex items-center justify-between border-b border-line px-4 py-3 font-mono text-[11px] uppercase tracking-widest text-faint">
-        <span>Live audio</span>
-        <span className="flex items-center gap-2">
-          <span
-            className={`size-1.5 rounded-full ${mode === "listening" ? "blink bg-signal" : "bg-faint"}`}
-          />
+    <div className="rounded-2xl border border-line bg-[#fbf8f2]/70 p-5 shadow-[0_1px_0_#fff_inset,0_12px_30px_-18px_rgba(60,40,20,0.35)]">
+      <div className="flex items-baseline justify-between gap-4">
+        <p className="font-serif text-lg italic">Say something.</p>
+        <span className="flex items-center gap-2 text-xs text-faint">
+          <span className={`size-1.5 rounded-full ${mode === "listening" ? "blink bg-accent" : "bg-line-strong"}`} />
           {mode === "listening" ? "Mic on" : "Demo"}
         </span>
       </div>
       <canvas
         ref={canvasRef}
-        className="block h-40 w-full px-4 sm:h-48"
+        className="my-4 block h-36 w-full sm:h-40"
         aria-label="Animated voice waveform"
         role="img"
       />
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3">
-        <p className="font-mono text-xs text-muted" aria-live="polite">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted" aria-live="polite">
           {status}
         </p>
         <button
           type="button"
           onClick={toggle}
           aria-pressed={mode === "listening"}
-          className="rounded-full border border-line-strong px-3.5 py-1.5 font-mono text-xs text-ink transition hover:border-signal hover:text-signal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
+          className="rounded-full border border-ink/80 px-4 py-1.5 text-sm font-medium transition hover:bg-ink hover:text-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
-          {mode === "listening" ? "Stop mic" : "Talk to it →"}
+          {mode === "listening" ? "Stop mic" : "Talk to it"}
         </button>
       </div>
     </div>

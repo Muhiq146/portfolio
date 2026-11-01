@@ -57,7 +57,7 @@ While I was in this code, I found a few related problems:
 
 - **Interruptions.** When a candidate starts talking over the interviewer, we stop the interviewer's audio. The copy going into the recording kept playing. I now keep track of the interviewer's audio sources in the mix and stop them too.
 - **Echo.** Without headphones, the mic picks up the interviewer's voice from the speakers. That doubled the interviewer in the mixed track and polluted the candidate-only track used for scoring. Turning on echo cancellation, noise suppression and auto gain for the mic fixed most of it.
-- **File format.** Safari can only record MP4, but its recordings were being uploaded and saved as `.webm`. I wrote a separate post on [recording audio across browsers](/blog/recording-audio-across-browsers/) about how I sorted that out.
+- **File format.** Safari can only record MP4, but its recordings were being uploaded and saved as `.webm`. I wrote a separate post on [recording audio across browsers](/blog/mediarecorder-audio-formats-chrome-safari-firefox/) about how I sorted that out.
 
 ## What I took away from it
 

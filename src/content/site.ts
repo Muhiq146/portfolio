@@ -1,6 +1,10 @@
 // All site copy lives here. Current-employer work is described by capability only:
 // no product, client or repo names.
 
+// The live address. Used for canonical URLs, the sitemap, the RSS feed and share links.
+// Change this one line when a custom domain is attached.
+export const SITE_URL = "https://muhiqkapadia.vercel.app";
+
 export const profile = {
   name: "Muhiq Kapadia",
   role: "Software Engineer",
@@ -15,7 +19,7 @@ export const profile = {
 
 export const stats = [
   { value: "~5 yrs", label: "of experience" },
-  { value: "15+", label: "products shipped" },
+  { value: "15+", label: "products" },
   { value: "3", label: "companies" },
 ];
 
